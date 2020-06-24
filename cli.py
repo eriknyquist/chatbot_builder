@@ -1,3 +1,6 @@
+import os
+import json
+
 from responder import BotBuilder
 
 COMMAND_TOKEN = '%'
@@ -9,6 +12,9 @@ CMD_LOAD = "load"
 CMD_UNLOAD = "unload"
 CMD_EDITING = "editing"
 CMD_RESPONDING = "responding"
+CMD_SAVE = "save"
+
+DEFAULT_JSON = os.path.join(os.path.expanduser('~'), 'bot-builder-database.json')
 
 def _split_args(text):
     ret = []
@@ -54,46 +60,50 @@ def _split_args(text):
 
     return ret
 
-def _on_new(builder, args):
+def _on_new(cli, args):
     if len(args) < 3:
         return "Please provide required arguments"
 
-    ctx = builder.add_context(args[0], args[1], args[2])
+    ctx = cli.builder.add_context(args[0], args[1], args[2])
     if ctx is None:
         return "Failed to add new context '%s'" % args[0]
 
     return "created new context %s" % ctx.name
 
-def _on_on(builder, args):
+def _on_on(cli, args):
     if len(args) < 2:
         return "Please provide required arguments"
 
-    builder.add_response(args[0], args[1])
+    cli.builder.add_response(args[0], args[1])
     return "Added new pattern/response"
 
-def _on_load(builder, args):
+def _on_load(cli, args):
     if len(args) < 1:
         return "Please provide required arguments"
 
-    ret = builder.load_context(args[0])
+    ret = cli.builder.load_context(args[0])
     if ret is None:
         return "No context by the name of '%s'" % args[0]
 
     return "Context '%s' is loaded" % args[0]
 
-def _on_unload(builder, args):
-    if builder.editing_context is None:
+def _on_unload(cli, args):
+    if cli.builder.editing_context is None:
         return "No context is loaded for editing"
 
-    name = builder.editing_context.name
-    builder.unload_context()
+    name = cli.builder.editing_context.name
+    cli.builder.unload_context()
     return "Unloaded context '%s'" % name
 
-def _on_editing(builder, args):
-    return builder.editing_desc()
+def _on_editing(cli, args):
+    return cli.builder.editing_desc()
 
-def _on_responding(builder, args):
-    return builder.responding_desc()
+def _on_responding(cli, args):
+    return cli.builder.responding_desc()
+
+def _on_save(cli, args):
+    cli.save()
+    return "All changes saved"
 
 command_table = {
     CMD_NEW: _on_new,
@@ -101,12 +111,33 @@ command_table = {
     CMD_LOAD: _on_load,
     CMD_UNLOAD: _on_unload,
     CMD_EDITING: _on_editing,
-    CMD_RESPONDING: _on_responding
+    CMD_RESPONDING: _on_responding,
+    CMD_SAVE: _on_save
 }
 
 class BotBuilderCLI(object):
-    def __init__(self):
+    def __init__(self, json_filename=DEFAULT_JSON):
+        self.json_filename = json_filename
         self.builder = BotBuilder()
+
+        if os.path.isfile(json_filename):
+            self.load(json_filename)
+
+    def load(self, filename=None):
+        if filename is None:
+            filename = self.json_filename
+
+        with open(filename, 'r') as fh:
+             attrs = json.load(fh)
+
+        self.builder.from_json(attrs)
+
+    def save(self, filename=None):
+        if filename is None:
+            filename = self.json_filename
+
+        with open(filename, 'w') as fh:
+            json.dump(self.builder.to_json(), fh, indent=4)
 
     def process_command(self, text):
         fields = text.split()
@@ -117,7 +148,7 @@ class BotBuilderCLI(object):
             return 'Unrecognised command "%s"' % cmd
 
         handler = command_table[cmd]
-        return handler(self.builder, _split_args(args))
+        return handler(self, _split_args(args))
 
     def process_message(self, text):
         message = text.strip()

@@ -4,8 +4,9 @@ from chatbot_utils.redict import ReDict
 
 CONTEXT_NAME_SEP = '::'
 
+NAME_KEY = "name"
 ENTRY_KEY = "entry"
-RESP_KEY = "response"
+RESP_KEY = "responses"
 DEFAULT_RESP_KEY = "default_responses"
 CTX_KEY = "contexts"
 
@@ -78,12 +79,14 @@ class BotContext(object):
 
     def to_json(self):
         ret = {}
+        ret[NAME_KEY] = self.name
         ret[ENTRY_KEY] = self.entry.dump_to_dict()
-        ret[RESP_KEY] = self.entry.dump_to_dict()
+        ret[RESP_KEY] = self.responses.dump_to_dict()
         ret[CTX_KEY] = {n: self.contexts[n].to_json() for n in self.contexts}
         return ret
 
     def from_json(self, attrs):
+        self.name = attrs[NAME_KEY]
         self.entry.load_from_dict(attrs[ENTRY_KEY])
         self.responses.load_from_dict(attrs[RESP_KEY])
 
@@ -92,6 +95,8 @@ class BotContext(object):
             c = BotContext(n)
             c.from_json(attrs[CTX_KEY][n])
             self.add_context(n, c)
+
+        return self
 
 class BotBuilder(object):
     def __init__(self):
@@ -107,6 +112,17 @@ class BotBuilder(object):
         ret[RESP_KEY] = self.responses.dump_to_dict()
         ret[CTX_KEY] = {n: self.contexts[n].to_json() for n in self.contexts}
         return ret
+
+    def from_json(self, attrs):
+        self.default_responses = attrs[DEFAULT_RESP_KEY]
+        self.responses.load_from_dict(attrs[RESP_KEY])
+        self.contexts = {}
+
+        for name in attrs[CTX_KEY]:
+            c = BotContext("").from_json(attrs[CTX_KEY][name])
+            self.contexts[name] = c
+
+        return self
 
     def _context_desc(self, context_msg, main_msg, ctx):
         if ctx is not None:
