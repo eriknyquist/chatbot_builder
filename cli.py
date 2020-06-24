@@ -10,9 +10,10 @@ CMD_NEW = "new"
 CMD_ON = "on"
 CMD_LOAD = "load"
 CMD_UNLOAD = "unload"
-CMD_EDITING = "editing"
+CMD_LOADED = "loaded"
 CMD_RESPONDING = "responding"
 CMD_SAVE = "save"
+CMD_DROP = "drop"
 
 DEFAULT_JSON = os.path.join(os.path.expanduser('~'), 'bot-builder-database.json')
 
@@ -68,7 +69,7 @@ def _on_new(cli, args):
     if ctx is None:
         return "Failed to add new context '%s'" % args[0]
 
-    return "created new context %s" % ctx.name
+    return "Created new context %s" % ctx.name
 
 def _on_on(cli, args):
     if len(args) < 2:
@@ -85,7 +86,7 @@ def _on_load(cli, args):
     if ret is None:
         return "No context by the name of '%s'" % args[0]
 
-    return "Context '%s' is loaded" % args[0]
+    return "Context '%s' is loaded for editing" % args[0]
 
 def _on_unload(cli, args):
     if cli.builder.editing_context is None:
@@ -95,7 +96,7 @@ def _on_unload(cli, args):
     cli.builder.unload_context()
     return "Unloaded context '%s'" % name
 
-def _on_editing(cli, args):
+def _on_loaded(cli, args):
     return cli.builder.editing_desc()
 
 def _on_responding(cli, args):
@@ -105,14 +106,19 @@ def _on_save(cli, args):
     cli.save()
     return "All changes saved"
 
+def _on_drop(cli, args):
+    cli.load()
+    return "All unsaved changes dropped"
+
 command_table = {
     CMD_NEW: _on_new,
     CMD_ON: _on_on,
     CMD_LOAD: _on_load,
     CMD_UNLOAD: _on_unload,
-    CMD_EDITING: _on_editing,
+    CMD_LOADED: _on_loaded,
     CMD_RESPONDING: _on_responding,
-    CMD_SAVE: _on_save
+    CMD_SAVE: _on_save,
+    CMD_DROP: _on_drop
 }
 
 class BotBuilderCLI(object):
@@ -127,8 +133,11 @@ class BotBuilderCLI(object):
         if filename is None:
             filename = self.json_filename
 
-        with open(filename, 'r') as fh:
-             attrs = json.load(fh)
+        if filename is None:
+            attrs = {}
+        else:
+            with open(filename, 'r') as fh:
+                 attrs = json.load(fh)
 
         self.builder.from_json(attrs)
 

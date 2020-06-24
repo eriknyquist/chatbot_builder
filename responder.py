@@ -114,13 +114,17 @@ class BotBuilder(object):
         return ret
 
     def from_json(self, attrs):
-        self.default_responses = attrs[DEFAULT_RESP_KEY]
-        self.responses.load_from_dict(attrs[RESP_KEY])
+        self.default_responses = []
+        self.responses = ReDict()
         self.contexts = {}
 
-        for name in attrs[CTX_KEY]:
-            c = BotContext("").from_json(attrs[CTX_KEY][name])
-            self.contexts[name] = c
+        if attrs:
+            self.default_responses = attrs[DEFAULT_RESP_KEY]
+            self.responses.load_from_dict(attrs[RESP_KEY])
+
+            for name in attrs[CTX_KEY]:
+                c = BotContext("").from_json(attrs[CTX_KEY][name])
+                self.contexts[name] = c
 
         return self
 
@@ -245,7 +249,8 @@ class BotBuilder(object):
                 if context is not None:
                     self.responding_context = context
                 else:
-                    response = random.choice(self.default_responses)
+                    #response = random.choice(self.default_responses)
+                    response = None
                     groups = None
 
         if None not in [response, groups]:
