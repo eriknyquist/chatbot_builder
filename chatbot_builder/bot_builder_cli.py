@@ -12,6 +12,7 @@ CMD_ON = "on"
 CMD_LOAD = "load"
 CMD_UNLOAD = "unload"
 CMD_LOADED = "loaded"
+CMD_DELETE = "delete"
 CMD_RESPONDING = "responding"
 CMD_SAVE = "save"
 CMD_DROP = "drop"
@@ -91,6 +92,16 @@ def _on_load(cli, args):
 
     return "Context '%s' is loaded for editing" % args[0]
 
+def _on_delete(cli, args):
+    if len(args) < 1:
+        return "Please provide required arguments"
+
+    ret = cli.builder.delete_context(args[0])
+    if ret is None:
+        return "No context by the name of '%s'" % args[0]
+
+    return "Context '%s' has been deleted" % args[0]
+
 def _on_unload(cli, args):
     if cli.builder.editing_context is None:
         return "No context is loaded for editing"
@@ -120,6 +131,7 @@ command_table = {
     CMD_LOAD: _on_load,
     CMD_UNLOAD: _on_unload,
     CMD_LOADED: _on_loaded,
+    CMD_DELETE: _on_delete,
     CMD_RESPONDING: _on_responding,
     CMD_SAVE: _on_save,
     CMD_DROP: _on_drop

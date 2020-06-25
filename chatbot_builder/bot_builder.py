@@ -213,6 +213,31 @@ class BotBuilder(object):
 
         return curr
 
+    def delete_context(self, context_name):
+        fields = context_name.split(CONTEXT_NAME_SEP)
+        curr = self
+        name = ""
+
+        if context_name.strip() == '':
+            return None
+
+        for field in fields[:-1]:
+            name = field.strip()
+            if name == '':
+                return None
+
+            try:
+                curr = curr.contexts[name]
+            except KeyError:
+                return False
+
+        try:
+            del curr.contexts[fields[-1].strip()]
+        except KeyError:
+            return False
+
+        return True
+
     def unload_context(self):
         self.editing_context = None
 
