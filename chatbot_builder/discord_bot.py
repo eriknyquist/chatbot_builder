@@ -8,7 +8,6 @@ class MessageResponse(object):
         self.member = member
         self.response_data = response_data
 
-
 class DiscordBot(object):
     def __init__(self, token, server):
         self.token = token

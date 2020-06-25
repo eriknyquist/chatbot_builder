@@ -1,11 +1,12 @@
 import os
 import json
 
-from responder import BotBuilder
+from chatbot_builder.bot_builder import BotBuilder
 
+# Input text starting with this will be considered a command
 COMMAND_TOKEN = '%'
 
-# command words
+# Command word definitions
 CMD_NEW = "new"
 CMD_ON = "on"
 CMD_LOAD = "load"
@@ -15,6 +16,7 @@ CMD_RESPONDING = "responding"
 CMD_SAVE = "save"
 CMD_DROP = "drop"
 
+# Default location of .json file if none is provided
 DEFAULT_JSON = os.path.join(os.path.expanduser('~'), 'bot-builder-database.json')
 
 def _split_args(text):
@@ -61,6 +63,7 @@ def _split_args(text):
 
     return ret
 
+# Command handlers
 def _on_new(cli, args):
     if len(args) < 3:
         return "Please provide required arguments"
@@ -110,6 +113,7 @@ def _on_drop(cli, args):
     cli.load()
     return "All unsaved changes dropped"
 
+# Dictionary mapping command words to command handlers
 command_table = {
     CMD_NEW: _on_new,
     CMD_ON: _on_on,
@@ -122,6 +126,10 @@ command_table = {
 }
 
 class BotBuilderCLI(object):
+    """
+    Creates a BotBuilder instance, and provides an API for processing input text
+    to get a response.
+    """
     def __init__(self, json_filename=DEFAULT_JSON):
         self.json_filename = json_filename
         self.builder = BotBuilder()
@@ -130,6 +138,9 @@ class BotBuilderCLI(object):
             self.load(json_filename)
 
     def load(self, filename=None):
+        """
+        Load a saved state from .json file
+        """
         if filename is None:
             filename = self.json_filename
 
@@ -142,6 +153,9 @@ class BotBuilderCLI(object):
         self.builder.from_json(attrs)
 
     def save(self, filename=None):
+        """
+        Save current state to .json file
+        """
         if filename is None:
             filename = self.json_filename
 
@@ -149,7 +163,11 @@ class BotBuilderCLI(object):
             json.dump(self.builder.to_json(), fh, indent=4)
 
     def process_command(self, text):
-        fields = text.split()
+        """
+        Process an input string containing a command (a string that starts with
+        COMMAND_TOKEN), and return the response
+        """
+        fields = text.split() 
         cmd = fields[0].lstrip(COMMAND_TOKEN).strip()
         args = ' '.join(fields[1:])
 
@@ -160,6 +178,10 @@ class BotBuilderCLI(object):
         return handler(self, _split_args(args))
 
     def process_message(self, text):
+        """
+        Process an input string (either a command or some conversational text),
+        and return the response
+        """
         message = text.strip()
 
         if message == '':
@@ -171,6 +193,9 @@ class BotBuilderCLI(object):
             return self.builder.get_response(text)
 
 def main():
+    """
+    Example main for testing, uses stdin for input
+    """
     builder_cli = BotBuilderCLI()
 
     while True:
