@@ -126,6 +126,12 @@ class BotBuilder(object):
                 c = BotContext("").from_json(attrs[CTX_KEY][name])
                 self.contexts[name] = c
 
+        if self.editing_context:
+            self.editing_context = self._context_by_name(self.editing_context.name)
+
+        if self.responding_context:
+            self.responding_context = self._context_by_name(self.responding_context.name)
+
         return self
 
     def _context_desc(self, context_msg, main_msg, ctx):
@@ -192,7 +198,7 @@ class BotBuilder(object):
         else:
             self.editing_context.add_response(pattern, response)
 
-    def load_context(self, context_name):
+    def _context_by_name(self, context_name):
         fields = context_name.split(CONTEXT_NAME_SEP)
         curr = self
 
@@ -209,9 +215,11 @@ class BotBuilder(object):
             except KeyError:
                 return None
 
-            self.editing_context = curr
-
         return curr
+
+    def load_context(self, context_name):
+        self.editing_context = self._context_by_name(context_name)
+        return self.editing_context
 
     def delete_context(self, context_name):
         fields = context_name.split(CONTEXT_NAME_SEP)
@@ -231,8 +239,16 @@ class BotBuilder(object):
             except KeyError:
                 return False
 
+        ctxname = fields[-1].strip()
+
+        if self.editing_context is curr.contexts[ctxname]:
+            self.editing_context = None
+
+        if self.responding_context is curr.contexts[ctxname]:
+            self.repsonding_context = None
+
         try:
-            del curr.contexts[fields[-1].strip()]
+            del curr.contexts[ctxname]
         except KeyError:
             return False
 
