@@ -16,6 +16,7 @@ CMD_DELETE = "delete"
 CMD_RESPONDING = "responding"
 CMD_SAVE = "save"
 CMD_DROP = "drop"
+CMD_TREE = "tree"
 
 # Default location of .json file if none is provided
 DEFAULT_JSON = os.path.join(os.path.expanduser('~'), 'bot-builder-database.json')
@@ -67,7 +68,7 @@ def _split_args(text):
 # Command handlers
 def _on_new(cli, args):
     if len(args) < 3:
-        return "Please provide required arguments"
+        return "Please provide a context name, entry pattern and entry response"
 
     ctx = cli.builder.add_context(args[0], args[1], args[2])
     if ctx is None:
@@ -77,14 +78,14 @@ def _on_new(cli, args):
 
 def _on_on(cli, args):
     if len(args) < 2:
-        return "Please provide required arguments"
+        return "Please provide a pattern and a response"
 
     cli.builder.add_response(args[0], args[1])
     return "Added new pattern/response"
 
 def _on_load(cli, args):
     if len(args) < 1:
-        return "Please provide required arguments"
+        return "Please provide name of context to load"
 
     ret = cli.builder.load_context(args[0])
     if ret is None:
@@ -94,7 +95,7 @@ def _on_load(cli, args):
 
 def _on_delete(cli, args):
     if len(args) < 1:
-        return "Please provide required arguments"
+        return "Please provide name of context to delete"
 
     ret = cli.builder.delete_context(args[0])
     if ret is None:
@@ -124,6 +125,16 @@ def _on_drop(cli, args):
     cli.load()
     return "All unsaved changes dropped"
 
+def _on_tree(cli, args):
+    if len(args) < 1:
+        return "Please provide name of context to get tree for"
+
+    ret = cli.builder.context_tree(args[0])
+    if ret is None:
+        return "No context by the name of %s" % args[0]
+
+    return ret
+
 # Dictionary mapping command words to command handlers
 command_table = {
     CMD_NEW: _on_new,
@@ -134,7 +145,8 @@ command_table = {
     CMD_DELETE: _on_delete,
     CMD_RESPONDING: _on_responding,
     CMD_SAVE: _on_save,
-    CMD_DROP: _on_drop
+    CMD_DROP: _on_drop,
+    CMD_TREE: _on_tree
 }
 
 class BotBuilderCLI(object):
@@ -180,7 +192,7 @@ class BotBuilderCLI(object):
         COMMAND_TOKEN), and return the response
         """
         fields = text.split() 
-        cmd = fields[0].lstrip(COMMAND_TOKEN).strip()
+        cmd = fields[0].lstrip(COMMAND_TOKEN).strip().lower()
         args = ' '.join(fields[1:])
 
         if cmd not in command_table:
@@ -200,7 +212,7 @@ class BotBuilderCLI(object):
             return None
 
         if message.startswith(COMMAND_TOKEN):
-            return self.process_command(message)
+            return  '```\n%s```' % self.process_command(message)
         else:
             return self.builder.get_response(text)
 

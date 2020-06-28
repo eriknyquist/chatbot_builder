@@ -217,6 +217,27 @@ class BotBuilder(object):
 
         return curr
 
+    def context_tree(self, context_name):
+        ctx = self._context_by_name(context_name)
+        if ctx is None:
+            return None
+
+        ret = ""
+        stack = [("", ctx)]
+
+        while stack:
+            header, ctx, = stack.pop(0)
+
+            ret += "%s%s\n" % (header, ctx.name)
+
+            if ctx.contexts:
+                header = "  " + header
+                names = list(ctx.contexts.keys())
+                for i in range(len(names)):
+                    stack.insert(0, (header, ctx.contexts[names[i]]))
+
+        return ret
+
     def load_context(self, context_name):
         self.editing_context = self._context_by_name(context_name)
         return self.editing_context
@@ -295,6 +316,6 @@ class BotBuilder(object):
                     groups = None
 
         if None not in [response, groups]:
-            response.format(*groups)
+            response = response.format(*groups)
 
         return response
