@@ -167,7 +167,7 @@ class BotBuilder(object):
     def add_default_response(self, text):
         self.default_responses.append(text)
 
-    def add_context(self, context_name, pattern, response, overwrite=False):
+    def add_context(self, context_name, overwrite=False):
 
         if self.editing_context is None:
             full_name = context_name
@@ -175,7 +175,6 @@ class BotBuilder(object):
             full_name = CONTEXT_NAME_SEP.join([self.editing_context.name, context_name])
 
         c = BotContext(full_name)
-        c.add_entry_phrase(pattern, response)
 
         if self.editing_context is None:
             if (not overwrite) and (context_name in self.contexts):
@@ -191,6 +190,13 @@ class BotBuilder(object):
 
         self.editing_context = c
         return c
+
+    def add_entry(self, pattern, response):
+        if self.editing_context is None:
+            return None
+
+        self.editing_context.add_entry_phrase(pattern, response)
+        return self.editing_context
 
     def add_response(self, pattern, response):
         if self.editing_context is None:

@@ -9,6 +9,7 @@ COMMAND_TOKEN = '%'
 # Command word definitions
 CMD_HELP = "help"
 CMD_NEW = "new"
+CMD_ENTRY = "entry"
 CMD_ON = "on"
 CMD_LOAD = "load"
 CMD_UNLOAD = "unload"
@@ -39,18 +40,24 @@ Usage information about [command_name] will be shown.
 """
 
 CMD_NEW_HELP = """
-{0} [name] [pattern] [response]
+{0} [name]
 
 Creates a new sub-context under the currently loaded context.
-[name] defines the context name, [pattern] is a regular expression for the bot to
-recognise and that will trigger entry into the new context, and [response] is the
-response that will be sent on entry into the new context.
-""" + RESPONSE_FORMAT_TEXT
+"""
+
+CMD_ENTRY_HELP = """
+{0} [pattern] [response]
+
+Creates a new entry pattern/response pair under the context currently loaded for editing.
+If the bot recognises an entry [pattern] for any of the sub-contexts in the current
+context, entry of that sub-context will be triggered, and [response] will be returned.
+If no context is currently loaded for editing, then this command will do nothing.
+"""
 
 CMD_ON_HELP = """
 {0} [pattern] [response]
 
-Creates a new pattern/response pair under the currently loaded context.
+Creates a new pattern/response pair under the context currently loaded for editing.
 [pattern] is a regular expression for the bot to recognise. [response] is the
 string that will be sent in response to the pattern being recognised.
 """ + RESPONSE_FORMAT_TEXT
@@ -177,14 +184,26 @@ def _split_args(text):
 
 # Command handlers
 def _on_new(cli, args):
-    if len(args) < 3:
-        return "Please provide a context name, entry pattern and entry response"
+    if len(args) < 1:
+        return "Please provide a context name"
 
-    ctx = cli.builder.add_context(args[0], args[1], args[2])
+    ctx = cli.builder.add_context(args[0])
     if ctx is None:
         return "Failed to add new context '%s'" % args[0]
 
     return "Created new context %s" % ctx.name
+
+def _on_entry(cli, args):
+    if len(args) < 2:
+        return "Please provide an entry pattern and repsonse"
+
+    ret = cli.builder.add_entry(args[0], args[1])
+    if ret is None:
+        return "No context is loaded for editing."
+
+    ctxname = cli.builder.editing_context.name
+    return ("Added new entry pattern/response to %s:\n\npattern  : %s\n\nresponse : %s\n"
+            % (ctxname, args[0], args[1]))
 
 def _on_on(cli, args):
     if len(args) < 2:
@@ -268,6 +287,7 @@ def _on_help(cli, args):
 command_table.update({
     CMD_HELP:        Command(CMD_HELP, _on_help, CMD_HELP_HELP),
     CMD_NEW:         Command(CMD_NEW, _on_new, CMD_NEW_HELP),
+    CMD_ENTRY:       Command(CMD_ENTRY, _on_entry, CMD_ENTRY_HELP),
     CMD_ON:          Command(CMD_ON, _on_on, CMD_ON_HELP),
     CMD_LOAD:        Command(CMD_LOAD, _on_load, CMD_LOAD_HELP),
     CMD_UNLOAD:      Command(CMD_UNLOAD, _on_unload, CMD_UNLOAD_HELP),
