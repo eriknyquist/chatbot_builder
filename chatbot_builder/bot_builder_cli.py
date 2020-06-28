@@ -27,6 +27,7 @@ def _split_args(text):
     escape = False
     space = False
     in_paren = False
+    parentype = None
 
     for c in text:
         if escape:
@@ -40,14 +41,23 @@ def _split_args(text):
                 ret.append(arg)
                 arg = ""
 
+        elif in_paren:
+            if c == parentype:
+                in_paren = False
+                space = False
+                if arg != "":
+                    ret.append(arg)
+                    arg = ""
+            else:
+                arg += c
+
         elif c in ['"', "'"]:
-            in_paren = not in_paren
+            in_paren = True
             space = False
+            parentype = c
             if arg != "":
                 ret.append(arg)
                 arg = ""
-
-            continue
 
         else:
             if c.isspace() and (not in_paren):
@@ -81,7 +91,7 @@ def _on_on(cli, args):
         return "Please provide a pattern and a response"
 
     cli.builder.add_response(args[0], args[1])
-    return "Added new pattern/response"
+    return "Added new pattern/response:\npattern  : %s\nresponse : %s\n" % (args[0], args[1])
 
 def _on_load(cli, args):
     if len(args) < 1:
@@ -171,8 +181,11 @@ class BotBuilderCLI(object):
         if filename is None:
             attrs = {}
         else:
-            with open(filename, 'r') as fh:
-                 attrs = json.load(fh)
+            if os.path.isfile(filename):
+                with open(filename, 'r') as fh:
+                    attrs = json.load(fh)
+            else:
+                attrs = {}
 
         self.builder.from_json(attrs)
 
