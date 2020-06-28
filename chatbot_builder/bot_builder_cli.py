@@ -7,6 +7,7 @@ from chatbot_builder.bot_builder import BotBuilder
 COMMAND_TOKEN = '%'
 
 # Command word definitions
+CMD_HELP = "help"
 CMD_NEW = "new"
 CMD_ON = "on"
 CMD_LOAD = "load"
@@ -18,8 +19,107 @@ CMD_SAVE = "save"
 CMD_DROP = "drop"
 CMD_TREE = "tree"
 
+RESPONSE_FORMAT_TEXT = """
+The provided response text may include format tokens that reference matching text
+within parenthesis groups in the pattern. These tokens should be of the form "{{n}}",
+where "n" is an integer representing the position of the parenthesis group within
+the pattern, from left-to-right.
+
+For example, given the pattern "I like ([a-z]*) and ([a-z]*)", and the response
+text "I like {{0}} too, but not {{1}}", an input of "I like cats and dogs" would yield
+a response of "I like cats too, but not dogs".
+"""
+
+# Help text definitions for command words
+CMD_HELP_HELP = """
+{0} [command_name]
+
+Get information about how to use a command by name.
+Usage information about [command_name] will be shown.
+"""
+
+CMD_NEW_HELP = """
+{0} [name] [pattern] [response]
+
+Creates a new sub-context under the currently loaded context.
+[name] defines the context name, [pattern] is a regular expression for the bot to
+recognise and that will trigger entry into the new context, and [response] is the
+response that will be sent on entry into the new context.
+""" + RESPONSE_FORMAT_TEXT
+
+CMD_ON_HELP = """
+{0} [pattern] [response]
+
+Creates a new pattern/response pair under the currently loaded context.
+[pattern] is a regular expression for the bot to recognise. [response] is the
+string that will be sent in response to the pattern being recognised.
+""" + RESPONSE_FORMAT_TEXT
+
+CMD_LOAD_HELP = """
+{0} [context_name]
+
+Loads the context [context_name] for editing.
+Further commands to create new subcontexts or pattern/response pairs will be
+applied to this context until it is unloaded.
+"""
+
+CMD_UNLOAD_HELP = """
+{0}
+
+Unloads the context that is currently loaded for editing, if any.
+"""
+
+CMD_LOADED_HELP = """
+{0}
+
+Shows information about the context currently loaded for editing, if any.
+"""
+
+CMD_DELETE_HELP = """
+{0} [context_name]
+
+Deletes the context [context_name]
+"""
+
+CMD_RESPONDING_HELP = """
+{0}
+
+Shows information about the context currently loaded for responding, if any.
+"""
+
+CMD_SAVE_HELP = """
+{0}
+
+Saves all unsaved changes.
+All commands to add/delete new contexts or pattern response pairs are temporary.
+This command saves all changes made since the last save operation.
+"""
+
+CMD_DROP_HELP = """
+{0}
+
+Drops all changes made since the last save operation.
+"""
+
+CMD_TREE_HELP = """
+{0} [context_name]
+
+Shows a tree view of all subcontexts contained under [context_name]
+"""
+
 # Default location of .json file if none is provided
 DEFAULT_JSON = os.path.join(os.path.expanduser('~'), 'bot-builder-database.json')
+
+command_table = {}
+
+class Command(object):
+    def __init__(self, word, handler, helptext):
+        self.word = word
+        self.handler = handler
+        self.helptext = helptext
+
+    def format_helptext(self):
+        return self.helptext.format(self.word)
 
 def _split_args(text):
     ret = []
@@ -152,19 +252,32 @@ def _on_tree(cli, args):
 
     return ret
 
+def _on_help(cli, args):
+    if len(args) < 1:
+        ret = ("Please provide the name of a command name to get help with. "
+                "Here are all possible command names:\n\n")
+        ret += "\n".join(["  %s" % n for n in list(command_table.keys())])
+        return ret
+
+    if args[0] not in command_table:
+        return "Unrecognised command '%s'" % args[0]
+
+    return command_table[args[0]].format_helptext()
+
 # Dictionary mapping command words to command handlers
-command_table = {
-    CMD_NEW: _on_new,
-    CMD_ON: _on_on,
-    CMD_LOAD: _on_load,
-    CMD_UNLOAD: _on_unload,
-    CMD_LOADED: _on_loaded,
-    CMD_DELETE: _on_delete,
-    CMD_RESPONDING: _on_responding,
-    CMD_SAVE: _on_save,
-    CMD_DROP: _on_drop,
-    CMD_TREE: _on_tree
-}
+command_table.update({
+    CMD_HELP:        Command(CMD_HELP, _on_help, CMD_HELP_HELP),
+    CMD_NEW:         Command(CMD_NEW, _on_new, CMD_NEW_HELP),
+    CMD_ON:          Command(CMD_ON, _on_on, CMD_ON_HELP),
+    CMD_LOAD:        Command(CMD_LOAD, _on_load, CMD_LOAD_HELP),
+    CMD_UNLOAD:      Command(CMD_UNLOAD, _on_unload, CMD_UNLOAD_HELP),
+    CMD_LOADED:      Command(CMD_LOADED, _on_loaded, CMD_LOADED_HELP),
+    CMD_DELETE:      Command(CMD_DELETE, _on_delete, CMD_DELETE_HELP),
+    CMD_RESPONDING:  Command(CMD_RESPONDING, _on_responding, CMD_RESPONDING_HELP),
+    CMD_SAVE:        Command(CMD_SAVE, _on_save, CMD_SAVE_HELP),
+    CMD_DROP:        Command(CMD_DROP, _on_drop, CMD_DROP_HELP),
+    CMD_TREE:        Command(CMD_TREE, _on_tree, CMD_TREE_HELP)
+})
 
 class BotBuilderCLI(object):
     """
@@ -174,6 +287,7 @@ class BotBuilderCLI(object):
     def __init__(self, json_filename=DEFAULT_JSON):
         self.json_filename = json_filename
         self.builder = BotBuilder()
+        self.command = None
 
         if os.path.isfile(json_filename):
             self.load(json_filename)
@@ -211,15 +325,15 @@ class BotBuilderCLI(object):
         Process an input string containing a command (a string that starts with
         COMMAND_TOKEN), and return the response
         """
-        fields = text.split() 
+        fields = text.split()
         cmd = fields[0].lstrip(COMMAND_TOKEN).strip().lower()
         args = ' '.join(fields[1:])
 
         if cmd not in command_table:
             return 'Unrecognised command "%s"' % cmd
 
-        handler = command_table[cmd]
-        return handler(self, _split_args(args))
+        self.command = command_table[cmd]
+        return self.command.handler(self, _split_args(args))
 
     def process_message(self, text):
         """
