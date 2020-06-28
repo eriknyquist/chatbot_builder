@@ -91,7 +91,14 @@ def _on_on(cli, args):
         return "Please provide a pattern and a response"
 
     cli.builder.add_response(args[0], args[1])
-    return "Added new pattern/response:\npattern  : %s\nresponse : %s\n" % (args[0], args[1])
+
+    if cli.builder.editing_context is None:
+        ctxname = "main context"
+    else:
+        ctxname = "context '%s'" % cli.builder.editing_context.name
+
+    return ("Added new pattern/response to %s:\n\npattern  : %s\n\nresponse : %s\n"
+            % (ctxname, args[0], args[1]))
 
 def _on_load(cli, args):
     if len(args) < 1:
