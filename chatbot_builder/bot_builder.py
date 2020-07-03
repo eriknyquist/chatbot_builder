@@ -47,6 +47,9 @@ class BotContext(object):
     def add_response(self, pattern, response):
         self.responses[pattern] = response
 
+    def delete_response(self, pattern):
+        del self.responses[pattern]
+
     def get_response(self, text):
         return _check_get_response(self.responses, text)
 
@@ -203,6 +206,17 @@ class BotBuilder(object):
             self.responses[pattern] = response
         else:
             self.editing_context.add_response(pattern, response)
+
+    def delete_response(self, pattern):
+        try:
+            if self.editing_context is None:
+                del self.responses[pattern]
+            else:
+                self.editing_context.delete_response(pattern)
+        except KeyError:
+            return None
+
+        return self
 
     def _context_by_name(self, context_name):
         fields = context_name.split(CONTEXT_NAME_SEP)

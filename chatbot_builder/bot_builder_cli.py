@@ -11,6 +11,7 @@ CMD_HELP = "help"
 CMD_NEW = "new"
 CMD_ENTRY = "entry"
 CMD_ON = "on"
+CMD_FORGET = "forget"
 CMD_LOAD = "load"
 CMD_UNLOAD = "unload"
 CMD_LOADED = "loaded"
@@ -52,7 +53,7 @@ Creates a new entry pattern/response pair under the context currently loaded for
 If the bot recognises an entry [pattern] for any of the sub-contexts in the current
 context, entry of that sub-context will be triggered, and [response] will be returned.
 If no context is currently loaded for editing, then this command will do nothing.
-"""
+""" + RESPONSE_FORMAT_TEXT
 
 CMD_ON_HELP = """
 {0} [pattern] [response]
@@ -61,6 +62,14 @@ Creates a new pattern/response pair under the context currently loaded for editi
 [pattern] is a regular expression for the bot to recognise. [response] is the
 string that will be sent in response to the pattern being recognised.
 """ + RESPONSE_FORMAT_TEXT
+
+CMD_FORGET_HELP = """
+{0} [pattern]
+
+Deletes the pattern/response pair associated with [pattern] under the context
+currently loaded for editing. If [pattern] does not exist in the context currently
+loaded for editing, then this command does nothing.
+"""
 
 CMD_LOAD_HELP = """
 {0} [context_name]
@@ -219,6 +228,21 @@ def _on_on(cli, args):
     return ("Added new pattern/response to %s:\n\npattern  : %s\n\nresponse : %s\n"
             % (ctxname, args[0], args[1]))
 
+def _on_forget(cli, args):
+    if len(args) < 1:
+        return "Please provide a pattern to delete"
+
+    if cli.builder.editing_context:
+        ctxname = cli.builder.editing_context.name
+    else:
+        ctxname = "(no context loaded, editing main context)"
+
+    ret = cli.builder.delete_response(args[0])
+    if ret is None:
+        return "No pattern '%s' in current context %s." % (args[0], ctxname)
+
+    return "Deleted '%s' from current context %s." % (args[0], ctxname)
+
 def _on_load(cli, args):
     if len(args) < 1:
         return "Please provide name of context to load"
@@ -289,6 +313,7 @@ command_table.update({
     CMD_NEW:         Command(CMD_NEW, _on_new, CMD_NEW_HELP),
     CMD_ENTRY:       Command(CMD_ENTRY, _on_entry, CMD_ENTRY_HELP),
     CMD_ON:          Command(CMD_ON, _on_on, CMD_ON_HELP),
+    CMD_FORGET:      Command(CMD_FORGET, _on_forget, CMD_FORGET_HELP),
     CMD_LOAD:        Command(CMD_LOAD, _on_load, CMD_LOAD_HELP),
     CMD_UNLOAD:      Command(CMD_UNLOAD, _on_unload, CMD_UNLOAD_HELP),
     CMD_LOADED:      Command(CMD_LOADED, _on_loaded, CMD_LOADED_HELP),
