@@ -44,6 +44,7 @@ CMD_NEW_HELP = """
 {0} [name]
 
 Creates a new sub-context under the currently loaded context.
+[name] will be the name of the new sub-context.
 """
 
 CMD_ENTRY_HELP = """
