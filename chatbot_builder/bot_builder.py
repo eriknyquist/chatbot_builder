@@ -108,6 +108,7 @@ class BotBuilder(object):
         self.default_responses = ["I don't know what that means"]
         self.editing_context = None
         self.responding_context = None
+        self.format_tokens = {}
 
     def to_json(self):
         ret = {}
@@ -136,6 +137,9 @@ class BotBuilder(object):
             self.responding_context = self._context_by_name(self.responding_context.name)
 
         return self
+
+    def add_format_tokens(self, token_dict):
+        self.format_tokens.update(token_dict)
 
     def _context_desc(self, context_msg, main_msg, ctx):
         if ctx is not None:
@@ -335,7 +339,4 @@ class BotBuilder(object):
                     response = None
                     groups = None
 
-        if None not in [response, groups]:
-            response = response.format(*groups)
-
-        return response
+        return response, groups

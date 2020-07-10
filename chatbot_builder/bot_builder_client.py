@@ -1,13 +1,51 @@
 import os
+
 from chatbot_builder.bot_builder_cli import BotBuilderCLI
 from chatbot_builder.discord_bot import DiscordBot, MessageResponse
 from chatbot_builder import constants as const
 
+MSG_AUTHOR_FMT_TOKEN = "author_mention"
+
+
+class DiscordBotBuilderCLI(BotBuilderCLI):
+    def format_command_response(self, msg, resp):
+        return "```\n%s```" % resp
+
+    def message_response_extra_format_tokens(self, msg, resp):
+        return{MSG_AUTHOR_FMT_TOKEN: msg.author.mention}
+
+    def get_message_content(self, msg):
+        return msg.content
 
 class DiscordBotBuilderClient(DiscordBot):
     def __init__(self, *args, **kwargs):
         super(DiscordBotBuilderClient, self).__init__(*args, **kwargs)
-        self.cli = BotBuilderCLI()
+        self.clis = {}
+
+        self.json_dir = os.path.join(os.path.expanduser(const.JSON_DIR))
+        if not os.path.isdir(self.json_dir):
+            os.mkdir(self.json_dir)
+
+    def _get_message_guild_id(self, message):
+        name = "default"
+        ident = 0
+
+        if message.guild is None:
+            # Message is a DM
+            if hasattr(message.author, 'guild'):
+                # DM from a user within a guild
+                name = message.author.guild.name
+                ident = message.author.build.id
+            else:
+                # DM from a user outside of a guild
+                name = message.author.name
+                ident = message.author.id
+        else:
+            # Message is in a group channel in some guild
+            name = message.guild.name
+            ident = message.guild.id
+
+        return "%s_%s" % (name, ident)
 
     def on_member_join(self, member):
         return MessageResponse('Welcome, %s!' % member.name, member=member)
@@ -19,10 +57,17 @@ class DiscordBotBuilderClient(DiscordBot):
         if message.author == self.client.user:
             return
 
-        resp = self.cli.process_message(message.content)
+        guild_id = self._get_message_guild_id(message)
+        if guild_id not in self.clis:
+            filename = os.path.join(self.json_dir, "%s.json" % guild_id)
+            self.clis[guild_id] = DiscordBotBuilderCLI(json_filename=filename)
+
+        resp = self.clis[guild_id].process_message(message)
         if resp is None:
             return None
 
+        #fmt_kwargs = {MSG_AUTHOR_FMT_TOKEN: message.author.mention}
+        #formatted = resp.format(**fmt_kwargs)
         return MessageResponse(resp, channel=message.channel)
 
 def main():

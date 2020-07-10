@@ -2,6 +2,7 @@ import os
 import json
 
 from chatbot_builder.bot_builder import BotBuilder
+from chatbot_builder import constants as const
 
 # Input text starting with this will be considered a command
 COMMAND_TOKEN = '%'
@@ -23,12 +24,12 @@ CMD_TREE = "tree"
 
 RESPONSE_FORMAT_TEXT = """
 The provided response text may include format tokens that reference matching text
-within parenthesis groups in the pattern. These tokens should be of the form "{{n}}",
-where "n" is an integer representing the position of the parenthesis group within
+within parenthesis groups in the pattern. These tokens should be of the form "{{pN}}",
+where "N" is an integer representing the position of the parenthesis group within
 the pattern, from left-to-right.
 
 For example, given the pattern "I like ([a-z]*) and ([a-z]*)", and the response
-text "I like {{0}} too, but not {{1}}", an input of "I like cats and dogs" would yield
+text "I like {{p0}} too, but not {{p1}}", an input of "I like cats and dogs" would yield
 a response of "I like cats too, but not dogs".
 """
 
@@ -338,6 +339,12 @@ class BotBuilderCLI(object):
         if os.path.isfile(json_filename):
             self.load(json_filename)
 
+    def message_response_extra_format_tokens(self, msg, resp):
+        return {}
+
+    def format_command_response(self, msg, resp):
+        return resp
+
     def load(self, filename=None):
         """
         Load a saved state from .json file
@@ -381,20 +388,46 @@ class BotBuilderCLI(object):
         self.command = command_table[cmd]
         return self.command.handler(self, _split_args(args))
 
-    def process_message(self, text):
+    def get_response_and_format(self, msg):
+        resp, groups = self.builder.get_response(self.get_message_content(msg))
+
+        if resp is None:
+            return None
+
+        # Build format args for match groups
+        if groups is None:
+            fmtargs = {}
+        else:
+            fmtargs = {"p%d" % i: groups[i] for i in range(len(groups))}
+
+        # Add user defined format args
+        fmtargs.update(self.message_response_extra_format_tokens(msg, resp))
+
+        # Do the formatting
+        try:
+            fmtd = resp.format(**fmtargs)
+        except KeyError:
+            return 'Invalid format token'
+
+        return fmtd
+
+    def process_message(self, message):
         """
         Process an input string (either a command or some conversational text),
         and return the response
         """
-        message = text.strip()
+        text = self.get_message_content(message).strip()
 
-        if message == '':
+        if text == '':
             return None
 
-        if message.startswith(COMMAND_TOKEN):
-            return  '```\n%s```' % self.process_command(message)
+        if text.startswith(COMMAND_TOKEN):
+            return self.format_command_response(message, self.process_command(text))
         else:
-            return self.builder.get_response(text)
+            return self.get_response_and_format(message)
+
+    def get_message_content(self, message):
+        return message
 
 def main():
     """
