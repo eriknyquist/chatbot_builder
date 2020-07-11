@@ -4,7 +4,8 @@ from chatbot_builder.bot_builder_cli import BotBuilderCLI
 from chatbot_builder.discord_bot import DiscordBot, MessageResponse
 from chatbot_builder import constants as const
 
-MSG_AUTHOR_FMT_TOKEN = "author_mention"
+MSG_AUTHOR_MENTION_FMT_TOKEN = "author_mention"
+MSG_AUTHOR_FMT_TOKEN = "author"
 
 
 class DiscordBotBuilderCLI(BotBuilderCLI):
@@ -12,7 +13,10 @@ class DiscordBotBuilderCLI(BotBuilderCLI):
         return "```\n%s```" % resp
 
     def message_response_extra_format_tokens(self, msg, resp):
-        return{MSG_AUTHOR_FMT_TOKEN: msg.author.mention}
+        return {
+            MSG_AUTHOR_MENTION_FMT_TOKEN: msg.author.mention,
+            MSG_AUTHOR_FMT_TOKEN: msg.author.name
+        }
 
     def get_message_content(self, msg):
         return msg.content

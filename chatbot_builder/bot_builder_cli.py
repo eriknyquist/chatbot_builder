@@ -406,8 +406,14 @@ class BotBuilderCLI(object):
         # Do the formatting
         try:
             fmtd = resp.format(**fmtargs)
-        except KeyError:
-            return 'Invalid format token'
+        except (KeyError, IndexError):
+            if self.builder.editing_context is None:
+                ctxname = "main context"
+            else:
+                ctxname = "context %s" % self.builder.editing_context.name
+
+            ret = "Invalid format token in response (%s):\n\n  %s" % (ctxname, resp)
+            return self.format_command_response(msg, ret)
 
         return fmtd
 
