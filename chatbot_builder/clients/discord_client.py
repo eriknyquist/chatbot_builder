@@ -1,7 +1,7 @@
 import os
 
 from chatbot_builder.bot_builder_cli import BotBuilderCLI
-from chatbot_builder.discord_bot import DiscordBot, MessageResponse
+from chatbot_builder.clients.discord_bot import DiscordBot, MessageResponse
 from chatbot_builder import constants as const
 
 MSG_AUTHOR_MENTION_FMT_TOKEN = "author_mention"
@@ -70,8 +70,6 @@ class DiscordBotBuilderClient(DiscordBot):
         if resp is None:
             return None
 
-        #fmt_kwargs = {MSG_AUTHOR_FMT_TOKEN: message.author.mention}
-        #formatted = resp.format(**fmt_kwargs)
         return MessageResponse(resp, channel=message.channel)
 
 def main():
