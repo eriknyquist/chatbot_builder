@@ -1,4 +1,6 @@
 import os
+import re
+import traceback
 import json
 
 from chatbot_builder.bot_builder import BotBuilder
@@ -6,6 +8,9 @@ from chatbot_builder import constants as const
 
 # Input text starting with this will be considered a command
 COMMAND_TOKEN = '%'
+
+# Marks the start of variable assignments within a repsonse
+VAR_ASSIGNMENT_SEP = ';;'
 
 # Command word definitions
 CMD_HELP = "help"
@@ -23,6 +28,8 @@ CMD_DROP = "drop"
 CMD_TREE = "tree"
 
 RESPONSE_FORMAT_TEXT = """
+----- FORMAT TOKENS -----
+
 The provided response text may include format tokens that reference matching text
 within parenthesis groups in the pattern. These tokens should be of the form "{{pN}}",
 where "N" is an integer representing the position of the parenthesis group within
@@ -31,6 +38,20 @@ the pattern, from left-to-right.
 For example, given the pattern "I like ([a-z]*) and ([a-z]*)", and the response
 text "I like {{p0}} too, but not {{p1}}", an input of "I like cats and dogs" would yield
 a response of "I like cats too, but not dogs".
+
+The provided response text may also contain commands to create custom format tokens
+on the fly. Custom format tokens may be mapped to arbitrary literal strings, or to
+other format tokens. This is achieved by appending ";;" to the end of the response
+text, to mark the beginning of the custom format tokens, followed by one or more
+comma-separated assignment statements of the form "name=value" (both name and value
+may be any string of characters, except for "," and "=").
+
+For example, given the pattern "I like (.*) and (.*)", and the response text
+"OK, {{p0}} and {{p0}};;like1={{p0}},like2={{p1}}", an input of "I like green and red"
+would yield a response of "OK, green and red", and would create two new format
+tokens. You can now use "like1" and "like2" as format tokens in further responses.
+For example, the response text "you like {{like1}} and {{like2}}" would yield
+"you like green and red" when triggered.
 """
 
 # Help text definitions for command words
@@ -220,6 +241,12 @@ def _on_on(cli, args):
     if len(args) < 2:
         return "Please provide a pattern and a response"
 
+    # Make sure a valid regex has been provided
+    try:
+        _ = re.compile(args[0])
+    except Exception:
+        return "Invalid regular expression"
+
     cli.builder.add_response(args[0], args[1])
 
     if cli.builder.editing_context is None:
@@ -388,6 +415,30 @@ class BotBuilderCLI(object):
         self.command = command_table[cmd]
         return self.command.handler(self, _split_args(args))
 
+    def get_var_assignments_from_response(self, resp, fmtargs):
+        fields = resp.split(VAR_ASSIGNMENT_SEP)
+        if len(fields) < 2:
+            return resp
+
+        text, ass = VAR_ASSIGNMENT_SEP.join(fields[:-1]), fields[-1]
+
+        try:
+            ass = ass.format(**fmtargs)
+        except KeyError:
+            return "Invalid format token in variable assignment"
+
+        # Do variable assignments
+        assdict = {}
+        fields = ass.split(',')
+        for f in fields:
+            names = f.split('=')
+            if len(names) != 2:
+                return resp
+
+            self.builder.add_variable(names[0].strip(), names[1].strip())
+
+        return text
+
     def get_response_and_format(self, msg):
         resp, groups = self.builder.get_response(self.get_message_content(msg))
 
@@ -399,6 +450,17 @@ class BotBuilderCLI(object):
             fmtargs = {}
         else:
             fmtargs = {"p%d" % i: groups[i] for i in range(len(groups))}
+
+        resp = self.get_var_assignments_from_response(resp, fmtargs)
+
+        # Get variables for current context
+        if self.builder.editing_context is None:
+            variables = self.builder.variables
+        else:
+            variables = self.builder.editing_context.variables
+
+        # Add variables to format args
+        fmtargs.update(variables)
 
         # Add user defined format args
         fmtargs.update(self.message_response_extra_format_tokens(msg, resp))
@@ -422,15 +484,18 @@ class BotBuilderCLI(object):
         Process an input string (either a command or some conversational text),
         and return the response
         """
-        text = self.get_message_content(message).strip()
+        try:
+            text = self.get_message_content(message).strip()
 
-        if text == '':
-            return None
+            if text == '':
+                return None
 
-        if text.startswith(COMMAND_TOKEN):
-            return self.format_command_response(message, self.process_command(text))
-        else:
-            return self.get_response_and_format(message)
+            if text.startswith(COMMAND_TOKEN):
+                return self.format_command_response(message, self.process_command(text))
+            else:
+                return self.get_response_and_format(message)
+        except Exception as e:
+            return "Uh, Something bad happened.\n\n" + traceback.format_exc()
 
     def get_message_content(self, message):
         return message

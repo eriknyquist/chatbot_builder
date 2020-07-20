@@ -7,6 +7,7 @@ CONTEXT_NAME_SEP = '::'
 NAME_KEY = "name"
 ENTRY_KEY = "entry"
 RESP_KEY = "responses"
+VARS_KEY = "variables"
 DEFAULT_RESP_KEY = "default_responses"
 CTX_KEY = "contexts"
 
@@ -32,6 +33,7 @@ class BotContext(object):
         self.entry = ReDict()
         self.responses = ReDict()
         self.contexts = {}
+        self.variables = {}
         self.name = name
 
     def add_entry_phrase(self, pattern, response):
@@ -43,6 +45,9 @@ class BotContext(object):
 
         self.contexts[context_name] = context
         return context
+
+    def add_variable(self, name, value):
+        self.variables[name] = value
 
     def add_response(self, pattern, response):
         self.responses[pattern] = response
@@ -75,6 +80,11 @@ class BotContext(object):
             for n in self.contexts:
                 ret += "%s\n" % self.contexts[n].name
 
+        if self.variables:
+            ret += "\nVariables:\n\n"
+            for n in self.variables:
+                ret += "%s=\"%s\"\n" % (n, self.variables[n])
+
         return ret
 
     def __repr__(self):
@@ -86,12 +96,19 @@ class BotContext(object):
         ret[ENTRY_KEY] = self.entry.dump_to_dict()
         ret[RESP_KEY] = self.responses.dump_to_dict()
         ret[CTX_KEY] = {n: self.contexts[n].to_json() for n in self.contexts}
+
+        if self.variables:
+            ret[VARS_KEY] = {n: self.variables[n] for n in self.variables}
+
         return ret
 
     def from_json(self, attrs):
         self.name = attrs[NAME_KEY]
         self.entry.load_from_dict(attrs[ENTRY_KEY])
         self.responses.load_from_dict(attrs[RESP_KEY])
+
+        if VARS_KEY in attrs:
+            self.variables = {n: attrs[VARS_KEY][n] for n in attrs[VARS_KEY]}
 
         self.contexts.clear()
         for n in attrs[CTX_KEY]:
@@ -108,13 +125,17 @@ class BotBuilder(object):
         self.default_responses = ["I don't know what that means"]
         self.editing_context = None
         self.responding_context = None
-        self.format_tokens = {}
+        self.variables = {}
 
     def to_json(self):
         ret = {}
         ret[DEFAULT_RESP_KEY] = self.default_responses
         ret[RESP_KEY] = self.responses.dump_to_dict()
         ret[CTX_KEY] = {n: self.contexts[n].to_json() for n in self.contexts}
+
+        if self.variables:
+            ret[VARS_KEY] = {n: self.variables[n] for n in self.variables}
+
         return ret
 
     def from_json(self, attrs):
@@ -130,6 +151,9 @@ class BotBuilder(object):
                 c = BotContext("").from_json(attrs[CTX_KEY][name])
                 self.contexts[name] = c
 
+        if VARS_KEY in attrs:
+            self.variables = {n: attrs[VARS_KEY][n] for n in attrs[VARS_KEY]}
+
         if self.editing_context:
             self.editing_context = self._context_by_name(self.editing_context.name)
 
@@ -137,9 +161,6 @@ class BotBuilder(object):
             self.responding_context = self._context_by_name(self.responding_context.name)
 
         return self
-
-    def add_format_tokens(self, token_dict):
-        self.format_tokens.update(token_dict)
 
     def _context_desc(self, context_msg, main_msg, ctx):
         if ctx is not None:
@@ -159,6 +180,11 @@ class BotBuilder(object):
                 for n in self.contexts:
                     ret += "%s\n" % n
 
+            if self.variables:
+                ret += "\nVariables:\n\n"
+                for n in self.variables:
+                    ret += "%s=\"%s\"\n" % (n, self.variables[n])
+
         return ret
 
     def editing_desc(self):
@@ -173,6 +199,12 @@ class BotBuilder(object):
 
     def add_default_response(self, text):
         self.default_responses.append(text)
+
+    def add_variable(self, name, value):
+        if self.editing_context is None:
+            self.variables[name] = value
+        else:
+            self.editing_context.add_variable(name, value)
 
     def add_context(self, context_name, overwrite=False):
 
