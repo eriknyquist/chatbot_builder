@@ -2,15 +2,10 @@ import os
 import re
 import traceback
 import json
+import time
 
 from chatbot_builder.bot_builder import BotBuilder
 from chatbot_builder import constants as const
-
-# Input text starting with this will be considered a command
-COMMAND_TOKEN = '%'
-
-# Marks the start of variable assignments within a repsonse
-VAR_ASSIGNMENT_SEP = ';;'
 
 # Command word definitions
 CMD_HELP = "help"
@@ -26,6 +21,8 @@ CMD_RESPONDING = "responding"
 CMD_SAVE = "save"
 CMD_DROP = "drop"
 CMD_TREE = "tree"
+CMD_SETVAR = "set"
+CMD_GETVAR = "get"
 
 RESPONSE_FORMAT_TEXT = """
 ----- FORMAT TOKENS -----
@@ -60,6 +57,20 @@ CMD_HELP_HELP = """
 
 Get information about how to use a command by name.
 Usage information about [command_name] will be shown.
+"""
+
+CMD_SETVAR_HELP = """
+{0} [token_name] [token_value]
+
+Creates a new format token [token_name] with the value [token_value]. [token_value]
+may be a literal string, or another format token. If [token_name] already exists
+then its value will be overwritten.
+"""
+
+CMD_GETVAR_HELP = """
+{0} [token_name]
+
+Gets the value of a format token named [token_name].
 """
 
 CMD_NEW_HELP = """
@@ -307,10 +318,16 @@ def _on_responding(cli, args):
     return cli.builder.responding_desc()
 
 def _on_save(cli, args):
+    if not cli.file_access_allowed():
+        return "Too much file access, please wait a bit and try again"
+
     cli.save()
     return "All changes saved"
 
 def _on_drop(cli, args):
+    if not cli.file_access_allowed():
+        return "Too much file access, please wait a bit and try again"
+
     cli.load()
     return "All unsaved changes dropped"
 
@@ -336,6 +353,32 @@ def _on_help(cli, args):
 
     return command_table[args[0]].format_helptext()
 
+def _on_setvar(cli, args):
+    if len(args) < 2:
+        return "Please provide a token name and token value"
+
+    if cli.builder.editing_context is None:
+        v = cli.builder.variables
+    else:
+        v = cli.builder.editing_context.variables
+
+    v[args[0]] = args[1]
+    return "value '%s' assigned to format token '%s'" % (args[1], args[0])
+
+def _on_getvar(cli, args):
+    if len(args) < 1:
+        return "Please provide a token name"
+
+    if cli.builder.editing_context is None:
+        v = cli.builder.variables
+    else:
+        v = cli.builder.editing_context.variables
+
+    if args[0] not in v:
+        return "No format token named '%s' in context currently loaded for editing" % args[0]
+
+    return v[args[0]]
+
 # Dictionary mapping command words to command handlers
 command_table.update({
     CMD_HELP:        Command(CMD_HELP, _on_help, CMD_HELP_HELP),
@@ -350,7 +393,9 @@ command_table.update({
     CMD_RESPONDING:  Command(CMD_RESPONDING, _on_responding, CMD_RESPONDING_HELP),
     CMD_SAVE:        Command(CMD_SAVE, _on_save, CMD_SAVE_HELP),
     CMD_DROP:        Command(CMD_DROP, _on_drop, CMD_DROP_HELP),
-    CMD_TREE:        Command(CMD_TREE, _on_tree, CMD_TREE_HELP)
+    CMD_TREE:        Command(CMD_TREE, _on_tree, CMD_TREE_HELP),
+    CMD_SETVAR:      Command(CMD_SETVAR, _on_setvar, CMD_SETVAR_HELP),
+    CMD_GETVAR:      Command(CMD_GETVAR, _on_getvar, CMD_GETVAR_HELP)
 })
 
 class BotBuilderCLI(object):
@@ -362,9 +407,13 @@ class BotBuilderCLI(object):
         self.json_filename = json_filename
         self.builder = BotBuilder()
         self.command = None
+        self.last_file_access_time = 0
 
         if os.path.isfile(json_filename):
             self.load(json_filename)
+
+        # Reset file access time so save/load works immediately
+        self.last_file_access_time = 0
 
     def message_response_extra_format_tokens(self, msg, resp):
         return {}
@@ -388,6 +437,7 @@ class BotBuilderCLI(object):
             else:
                 attrs = {}
 
+        self.last_file_access_time = time.time()
         self.builder.from_json(attrs)
 
     def save(self, filename=None):
@@ -400,13 +450,23 @@ class BotBuilderCLI(object):
         with open(filename, 'w') as fh:
             json.dump(self.builder.to_json(), fh, indent=4)
 
+        self.last_file_access_time = time.time()
+
+    def file_access_allowed(self):
+        """
+        Returns true if the last file access was at least const.FILE_ACCESS_DELAY_SECS
+        in the past.
+        """
+        delta = time.time() - self.last_file_access_time
+        return delta >= const.FILE_ACCESS_DELAY_SECS
+
     def process_command(self, text):
         """
         Process an input string containing a command (a string that starts with
-        COMMAND_TOKEN), and return the response
+        const.COMMAND_TOKEN), and return the response
         """
         fields = text.split()
-        cmd = fields[0].lstrip(COMMAND_TOKEN).strip().lower()
+        cmd = fields[0].lstrip(const.COMMAND_TOKEN).strip().lower()
         args = ' '.join(fields[1:])
 
         if cmd not in command_table:
@@ -416,11 +476,11 @@ class BotBuilderCLI(object):
         return self.command.handler(self, _split_args(args))
 
     def get_var_assignments_from_response(self, resp, fmtargs):
-        fields = resp.split(VAR_ASSIGNMENT_SEP)
+        fields = resp.split(const.VAR_ASSIGNMENT_SEP)
         if len(fields) < 2:
             return resp
 
-        text, ass = VAR_ASSIGNMENT_SEP.join(fields[:-1]), fields[-1]
+        text, ass = const.VAR_ASSIGNMENT_SEP.join(fields[:-1]), fields[-1]
 
         try:
             ass = ass.format(**fmtargs)
@@ -490,7 +550,7 @@ class BotBuilderCLI(object):
             if text == '':
                 return None
 
-            if text.startswith(COMMAND_TOKEN):
+            if text.startswith(const.COMMAND_TOKEN):
                 return self.format_command_response(message, self.process_command(text))
             else:
                 return self.get_response_and_format(message)
