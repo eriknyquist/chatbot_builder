@@ -73,19 +73,13 @@ class DiscordBotBuilderClient(DiscordBot):
         return MessageResponse(resp, channel=message.channel)
 
 def main():
-    if const.DISCORD_SERVER_ENV_VAR not in os.environ:
-        raise RuntimeError("Environment variable '{0}' Is not set. Set '{0}' to the "
-                           "name of the guild/server you want the bot to connect "
-                           "with.".format(const.DISCORD_SERVER_ENV_VAR))
-
     if const.DISCORD_TOKEN_ENV_VAR not in os.environ:
         raise RuntimeError("Environment variable '{0}' Is not set. Set '{0}' to your "
                            "bot API token.".format(const.DISCORD_TOKEN_ENV_VAR))
 
-    server = os.environ[const.DISCORD_SERVER_ENV_VAR]
     token = os.environ[const.DISCORD_TOKEN_ENV_VAR]
 
-    b = DiscordBotBuilderClient(token, server)
+    b = DiscordBotBuilderClient(token, '')
     b.run()
 
 if __name__ == "__main__":

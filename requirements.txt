@@ -1,3 +1,3 @@
 wheel
-discord
+discord.py
 chatbot_utils
