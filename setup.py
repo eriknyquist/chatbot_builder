@@ -33,5 +33,5 @@ setup(
     author_email='eknyquist@gmail.com',
     license='Apache 2.0',
     install_requires=dependencies,
-    packages=['chatbot_builder']
+    packages=find_packages(),
 )
